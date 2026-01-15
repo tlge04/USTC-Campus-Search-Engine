@@ -354,7 +354,7 @@ if __name__ == '__main__':
         # Administrative departments
         "https://bwc.ustc.edu.cn/5655/list1.htm",
         "https://lib.ustc.edu.cn/",
-        "https://www.ustc.edu.cn/"  # 备选种子
+        "https://www.ustc.edu.cn/"  
     ]
     
     # 启动爬虫主程序
