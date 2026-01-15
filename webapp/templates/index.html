@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>USTC Search Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8f9fa;
+            margin: 0;
+        }
+        .main-container {
+            text-align: center;
+            width: 100%;
+            max-width: 650px;
+            margin-top: -120px;
+            padding: 20px;
+        }
+        .logo {
+            font-size: 80px;
+            font-weight: bold;
+            color: #004098; /* USTC 标准蓝 */
+            margin-bottom: 30px;
+            font-family: 'Arial', sans-serif;
+            letter-spacing: -3px;
+            user-select: none;
+        }
+        .logo span { color: #d71318;  }
+        
+        .search-box {
+            position: relative;
+            width: 100%;
+        }
+        .form-control-lg {
+            border-radius: 24px;
+            padding: 12px 25px;
+            font-size: 16px;
+            border: 1px solid #dfe1e5;
+            box-shadow: none;
+            transition: all 0.2s;
+        }
+        .form-control-lg:hover, .form-control-lg:focus {
+            box-shadow: 0 1px 6px rgba(32,33,36,0.28);
+            border-color: rgba(223,225,229,0);
+            outline: none;
+        }
+        .footer {
+            position: fixed;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: #70757a;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <div class="logo">USTC <span>Search</span></div>
+    
+    <form action="/search" method="get">
+        <div class="search-box">
+            <input type="text" name="q" class="form-control form-control-lg" placeholder="在此输入关键词，例如：奖学金、通知..." autocomplete="off" required>
+        </div>
+    </form>
+</div>
+
+<div class="footer">
+    &copy; 2026 University of Science and Technology of China | Big Data System Comprehensive Experiment
+</div>
+
+</body>
+</html>

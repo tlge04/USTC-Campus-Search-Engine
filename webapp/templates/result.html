@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ query }} - USTC Search</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #fff; }
+        .header {
+            border-bottom: 1px solid #ebebeb;
+            padding: 20px 30px;
+            background: #fff;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .logo-small {
+            font-size: 24px;
+            font-weight: bold;
+            color: #004098;
+            text-decoration: none;
+            margin-right: 30px;
+            letter-spacing: -1px;
+        }
+        .search-input {
+            width: 600px;
+            border-radius: 24px;
+            padding-left: 20px;
+            border: 1px solid #dfe1e5;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .search-input:hover, .search-input:focus {
+            box-shadow: 0 1px 6px rgba(32,33,36,0.28);
+            border-color: rgba(223,225,229,0);
+        }
+        .result-container {
+            max-width: 800px;
+            margin-left: 150px; 
+            padding-top: 20px;
+            padding-bottom: 50px;
+        }
+        .result-stats {
+            color: #70757a;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .result-item {
+            margin-bottom: 30px;
+        }
+        .result-url {
+            color: #202124;
+            font-size: 14px;
+            margin-bottom: 2px;
+            display: flex;
+            align-items: center;
+        }
+        .result-url cite {
+            color: #006621;
+            font-style: normal;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 400px;
+        }
+        .result-title {
+            font-size: 20px;
+            color: #1a0dab;
+            text-decoration: none;
+            display: block;
+            line-height: 1.3;
+        }
+        .result-title:hover { text-decoration: underline; }
+        .result-snippet {
+            color: #4d5156;
+            font-size: 14px;
+            line-height: 1.58;
+            margin-top: 5px;
+            word-wrap: break-word;
+        }
+        /* 关键词高亮样式 */
+        em {
+            color: #ea4335;
+            font-weight: bold;
+            font-style: normal;
+        }
+        .badge-kw {
+            font-size: 12px;
+            margin-right: 5px;
+            background-color: #f1f3f4;
+            color: #5f6368;
+            border: 1px solid #dadce0;
+            border-radius: 12px;
+            padding: 2px 10px;
+        }
+        
+        /* 分页条样式 */
+        .pagination-container {
+            margin-top: 40px;
+            display: flex;
+            justify-content: center;
+        }
+        .page-link {
+            color: #1a0dab;
+            border: none;
+            margin: 0 2px;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            line-height: 24px;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .page-link:hover {
+            background-color: #f1f3f4;
+            color: #1a0dab;
+            text-decoration: underline;
+        }
+        .page-item.active .page-link {
+            background-color: #e8f0fe;
+            color: #1a0dab;
+            font-weight: bold;
+            text-decoration: none;
+        }
+        .page-link-text {
+            width: auto;
+            border-radius: 4px;
+            padding: 0 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header d-flex align-items-center">
+    <a href="/" class="logo-small">USTC <span style="color:#d71318">Search</span></a>
+    <form action="/search" method="get" class="d-flex flex-grow-1">
+        <input type="text" name="q" class="form-control search-input" value="{{ query }}">
+        <button class="btn btn-primary ms-3" type="submit" style="border-radius: 24px; padding: 6px 24px;">搜索</button>
+    </form>
+</div>
+
+<div class="result-container">
+    <div class="result-stats">
+        找到约 {{ count }} 条结果 （用时 {{ time }} 秒）
+    </div>
+
+    {% if count == 0 %}
+        <div class="alert alert-warning">
+            没有找到与 "<strong>{{ query }}</strong>" 相关的文档。<br>
+            <div class="mt-2 text-muted small">
+                建议：<br>
+                1. 请检查输入字词有无错误。<br>
+                2. 请尝试其他的查询词。
+            </div>
+        </div>
+    {% endif %}
+
+    {% for item in results %}
+    <div class="result-item">
+        <div class="result-url">
+            <cite>{{ item.url }}</cite>
+            <span class="text-muted ms-2" style="font-size: 12px;">&middot; {{ item.date }}</span>
+        </div>
+        <a href="/download/{{ item.row_key }}" class="result-title" target="_blank">{{ item.title }}</a>
+        
+        <div class="result-snippet">
+            {{ item.snippet | safe }}
+        </div>
+        
+        <div class="mt-2">
+            {% for kw in item.keywords %}
+                <span class="badge badge-kw">{{ kw }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    {% if total_pages > 1 %}
+    <nav class="pagination-container">
+        <ul class="pagination">
+            {% if page > 1 %}
+            <li class="page-item">
+                <a class="page-link page-link-text" href="{{ url_for('search', q=query, page=page-1) }}">
+                    <span aria-hidden="true">&laquo; 上一页</span>
+                </a>
+            </li>
+            {% endif %}
+
+            {% for p in range(1, total_pages + 1) %}
+                {% if p <= 10 %} 
+                <li class="page-item {{ 'active' if p == page else '' }}">
+                    <a class="page-link" href="{{ url_for('search', q=query, page=p) }}">{{ p }}</a>
+                </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if page < total_pages %}
+            <li class="page-item">
+                <a class="page-link page-link-text" href="{{ url_for('search', q=query, page=page+1) }}">
+                    <span aria-hidden="true">下一页 &raquo;</span>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+    </div>
+
+</body>
+</html>
