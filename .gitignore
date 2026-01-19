@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 
-# 虚拟环境 (千万别传这个，几百兆全是垃圾)
+# 虚拟环境
 venv/
 env/
 .env
@@ -15,7 +15,7 @@ env/
 *.log
 .DS_Store
 
-# 大数据文件 (不要把爬下来的几千个PDF传上去，GitHub有限制)
+# 大数据文件
 data/
 *.pdf
 *.docx
