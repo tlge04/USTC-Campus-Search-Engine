@@ -16,6 +16,4 @@ env/
 .DS_Store
 
 # 大数据文件
-data/
-*.pdf
-*.docx
+Senior_Data/

@@ -24,10 +24,10 @@
 ├─────────────┬───────────────────┬───────────────────────┤
 │   数据采集   │    分布式存储      │      应用层           │
 ├─────────────┼───────────────────┼───────────────────────┤
-│ Python      │ HDFS (文件存储)    │ Flask (Web框架)       │
-│ Requests    │ HBase (元数据+索引)│ Bootstrap (前端UI)    │
-│ BeautifulSoup│ Thrift (RPC通信) │ Jinja2 (模板引擎)     │
-│ Jieba       │                   │                       │
+│ Python      │ HDFS (文件存储)    │ FastAPI (Web框架)     │
+│ Requests    │ HBase (元数据+索引)│ Uvicorn (ASGI服务器)  │
+│ BeautifulSoup│ Thrift (RPC通信) │ Bootstrap (前端UI)    │
+│ Jieba       │                   │ Jinja2 (模板引擎)     │
 └─────────────┴───────────────────┴───────────────────────┘
 ```
 
@@ -85,9 +85,17 @@
 
 #### 2.2.4 Web应用技术
 
-**Flask框架**：轻量级Python Web框架
+**FastAPI框架**：现代高性能Python Web框架
+- 基于ASGI异步服务器，支持高并发请求
+- 自动API文档生成（Swagger UI）
 - 路由映射：首页、搜索、下载三个核心接口
 - 模板渲染：使用Jinja2引擎生成动态页面
+- 类型提示和自动参数校验（Pydantic）
+
+**Uvicorn服务器**：轻量级ASGI服务器
+- 基于uvloop高性能事件循环
+- 支持HTTP/1.1和WebSocket
+- 适合生产环境部署
 
 **搜索算法**：三维加权相关度计分
 ```
@@ -269,18 +277,18 @@ def _handle_file(self, resp, url, url_hash, ext):
 ### 4.4 三维相关度计分搜索
 
 ```python
-@app.route('/search')
-def search():
-    query = request.args.get('q', '').strip()
+@app.get('/search', response_class=HTMLResponse)
+async def search(request: Request, q: str = "", page: int = Query(default=1, ge=1)):
+    query = q.strip()
     scored_results = []
-    
+
     for key, data in table.scan():
         title = data.get(b'meta:title', b'').decode('utf-8', 'ignore')
         content = data.get(b'data:content', b'').decode('utf-8', 'ignore')
         keywords_list = data.get(b'index:keywords', b'').decode().split(',')
-        
+
         score = 0
-        
+
         # 基础过滤
         if query not in title and query not in content:
             continue
@@ -288,44 +296,56 @@ def search():
         # 维度一: 标题命中(权重100)
         if query in title:
             score += 100
-        
+
         # 维度二: 关键词命中(权重50)
         if query in keywords_list:
             score += 50
-        
+
         # 维度三: 正文词频(权重1,上限20)
         term_count = content.count(query)
         score += min(term_count, 20)
-        
+
         scored_results.append({'score': score, ...})
-    
+
     # 按分数排序
     scored_results.sort(key=lambda x: x['score'], reverse=True)
+
+    # 返回模板响应
+    return templates.TemplateResponse('result.html', {
+        "request": request,
+        "query": query,
+        "results": scored_results,
+        ...
+    })
 ```
 
 ### 4.5 HDFS文件下载接口
 
 ```python
-@app.route('/download/<path:row_key>')
-def download(row_key):
+@app.get('/download/{row_key:path}')
+async def download(row_key: str):
     """从HDFS流式下载文件"""
     # 查询HBase获取HDFS路径
     data = table.row(row_key.encode())
     hdfs_path = data.get(b'data:hdfs_path', b'').decode()
     file_name = data.get(b'meta:title', b'download.file').decode()
-    
+
     # 通过WSL调用HDFS读取文件
     cmd = f'wsl {HDFS_BIN} dfs -cat "{hdfs_path}"'
-    process = subprocess.Popen(cmd, shell=True, 
-                               stdout=subprocess.PIPE, 
+    process = subprocess.Popen(cmd, shell=True,
+                               stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE)
     file_data, stderr = process.communicate()
-    
-    # 流式传输给浏览器
-    return send_file(
-        io.BytesIO(file_data),
-        as_attachment=True,
-        download_name=file_name
+
+    # 返回二进制响应(触发浏览器下载)
+    from urllib.parse import quote
+    encoded_filename = quote(file_name)
+    return Response(
+        content=file_data,
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"
+        }
     )
 ```
 
@@ -359,9 +379,19 @@ def download(row_key):
 - 检测到封禁后休眠60秒
 
 #### 坑5：HBase中文乱码
-**问题**：存储的中文文件名显示乱码  
-**原因**：未指定UTF-8编码  
+**问题**：存储的中文文件名显示乱码
+**原因**：未指定UTF-8编码
 **解决**：所有字符串使用`.encode('utf-8', 'ignore')`编码，读取时使用`.decode('utf-8', 'ignore')`
+
+#### 坑6：Flask迁移FastAPI模板路径问题
+**问题**：重构为FastAPI后，访问首页出现`TemplateNotFound`错误
+**原因**：Flask自动以脚本文件所在目录为基础解析`templates/`，而FastAPI的`Jinja2Templates`使用当前工作目录（CWD）
+**解决**：使用绝对路径配置模板目录
+```python
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+```
+
 
 ### 5.2 错误总结
 
@@ -381,6 +411,12 @@ def download(row_key):
 
 5. **性能优化意识**：理解了为什么需要倒排索引（当前全表扫描在数据量大时会很慢），为后续优化指明方向
 
+6. **框架迁移实践**：成功将Web后端从Flask重构为FastAPI，体验了现代异步框架的优势：
+   - **性能提升**：ASGI异步架构相比WSGI同步处理更高效
+   - **类型安全**：Pydantic自动参数校验减少运行时错误
+   - **开发体验**：自动生成的API文档（访问`/docs`）极大提升开发调试效率
+   - **框架差异理解**：深刻理解了不同框架对路径解析、请求处理等细节的差异
+
 ### 5.4 未来改进方向
 
 1. **引入Elasticsearch**：替换全表扫描，实现真正的倒排索引检索
@@ -394,8 +430,9 @@ def download(row_key):
 
 1. Apache HBase官方文档: https://hbase.apache.org/
 2. Apache Hadoop HDFS文档: https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-hdfs/
-3. Flask官方文档: https://flask.palletsprojects.com/
-4. Jieba分词库: https://github.com/fxsjy/jieba
-5. Beautiful Soup文档: https://www.crummy.com/software/BeautifulSoup/bs4/doc/
+3. FastAPI官方文档: https://fastapi.tiangolo.com/
+4. Uvicorn官方文档: https://www.uvicorn.org/
+5. Jieba分词库: https://github.com/fxsjy/jieba
+6. Beautiful Soup文档: https://www.crummy.com/software/BeautifulSoup/bs4/doc/
 
 ---
